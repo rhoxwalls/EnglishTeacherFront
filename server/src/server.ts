@@ -1,5 +1,5 @@
 import express from "express";
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express } from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import helmet from "helmet";
@@ -7,8 +7,9 @@ import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 
 // IMPORT ROUTES
-import authRoutes from "./routes/authRoutes.js"
-import classRoomRoutes from "./routes/classRoomRoutes.js"
+import authRoutes from "./routes/authRoutes.js";
+import classRoomRoutes from "./routes/classRoomRoutes.js";
+import eventRoutes from "./routes/EventRoutes.js";
 
 dotenv.config();
 
@@ -18,13 +19,24 @@ const MONGODB_URI = process.env.MONGODB_URI || "";
 
 app.use(helmet());
 
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  }),
-);
+const allowedOrigins = [
+  "http://localhost:5173", // Local
+  "https://tu-app-frontend.vercel.app", // URL de producción (reemplazar luego)
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+}));
+
+
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
@@ -36,35 +48,23 @@ app.use(limiter);
 
 app.use(express.json());
 
-
-
-const connectDB = async ()=>{
-  try{
-    if(!MONGODB_URI){
+const connectDB = async () => {
+  try {
+    if (!MONGODB_URI) {
       throw new Error("MONGODB_URI no está definida en el archivo .env");
-    };
+    }
     await mongoose.connect(MONGODB_URI);
-    console.log('✅ Conectado exitosamente a MongoDB Atlas');
-  }catch(error){
-    console.error('❌ Error conectando a MongoDB:', error);
+    console.log("✅ Conectado exitosamente a MongoDB Atlas");
+  } catch (error) {
+    console.error("❌ Error conectando a MongoDB:", error);
     process.exit(1);
   }
-}
+};
 
 // --- RUTAS (Endpoints) ---
-app.use('/api/auth', authRoutes);
-app.use('/api/classrooms',classRoomRoutes);
-
-
-// Ruta de prueba para ver si el servidor respira
-app.get('/', (req: Request, res: Response) => {
-  res.send('API de English Platform funcionando 🚀');
-});
-
-// AQUÍ importarás tus rutas futuras, por ejemplo:
-// app.use('/api/users', userRoutes);
-// app.use('/api/salas', salaRoutes);
-
+app.use("/api/auth", authRoutes);
+app.use("/api/classrooms", classRoomRoutes);
+app.use("/api/events", eventRoutes);
 
 // --- INICIO DEL SERVIDOR ---
 
@@ -72,6 +72,8 @@ app.get('/', (req: Request, res: Response) => {
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`📡 Servidor escuchando en el puerto ${PORT}`);
-    console.log(`🛡️  Modo: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🛡️  Modo: ${process.env.NODE_ENV || "development"}`);
   });
 });
+
+
